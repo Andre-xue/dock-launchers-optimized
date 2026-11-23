@@ -444,6 +444,7 @@ static NSString *SignatureForEvent(NSEvent *e);
 @property (strong) TitlePillView *windowTitleLabel;
 @property (strong) NSTextField *hintLabel;
 @property (strong) NSTextField *searchField;
+@property (strong) NSTextField *groupCountLabel;
 @property (strong) NSButton *pinBtn;
 @property BOOL pinned;
 @property (strong) NSMutableSet *multiSel;
@@ -707,7 +708,7 @@ static NSColor *ThemeText(NSInteger t) {
 }
 static NSColor *ThemeHint(NSInteger t) {
   switch (t) {
-    case 4: return [NSColor colorWithCalibratedWhite:1.0 alpha:0.55];
+    case 4: return [NSColor colorWithCalibratedWhite:1.0 alpha:0.68]; // 玻璃底上次级文字不低于 0.65，保证可读
     case 1: case 2: case 3: return [NSColor colorWithCalibratedWhite:1.0 alpha:0.65];
     default: return [NSColor secondaryLabelColor];
   }
@@ -775,6 +776,14 @@ static NSColor *ThemeAccent(NSInteger t) {
   return NSPointInRect(point, self.bounds) ? self : [super hitTest:point];
 }
 - (void)drawRect:(NSRect)dirtyRect {
+  if (gTheme == 4 && !self.iconMode && !self.selected) { // 液态玻璃：未选中行做极淡玻璃行
+    NSBezierPath *gp = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(self.bounds, 2, 2) xRadius:8 yRadius:8];
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.05] setFill];
+    [gp fill];
+    gp.lineWidth = 1;
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.08] setStroke];
+    [gp stroke];
+  }
   if (self.selected && !self.iconMode) {
     [(self.selColor ?: ThemeSel(gTheme)) setFill];
     CGFloat rr = (gTheme == 4) ? 6 : 10; // C 主题低圆角
@@ -785,6 +794,16 @@ static NSColor *ThemeAccent(NSInteger t) {
       bp.lineWidth = 1.5;
       [ThemeAccent(gTheme) setStroke];
       [bp stroke];
+      NSBezierPath *hp = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(self.bounds, 3.5, 3.5) xRadius:5 yRadius:5];
+      hp.lineWidth = 1;
+      [[NSColor colorWithCalibratedWhite:1.0 alpha:0.22] setStroke]; // 玻璃胶囊高光边
+      [hp stroke];
+      // 第二轮：选中行右侧 ↵ 打开提示
+      NSFont *ef = [NSFont systemFontOfSize:13 weight:NSFontWeightSemibold];
+      NSDictionary *ea = @{NSFontAttributeName: ef, NSForegroundColorAttributeName: [ThemeAccent(gTheme) colorWithAlphaComponent:0.95]};
+      NSString *es = @"↵";
+      NSSize esz = [es sizeWithAttributes:ea];
+      [es drawAtPoint:NSMakePoint(NSWidth(self.bounds) - esz.width - 12, (NSHeight(self.bounds) - esz.height) / 2.0) withAttributes:ea];
     }
   }
   if (self.dropHighlight) {
@@ -931,10 +950,10 @@ static NSColor *ThemeAccent(NSInteger t) {
   CGFloat r = pro ? 6.0 : NSHeight(self.bounds) / 2.0; // C 主题：低圆角深色标牌
   NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:self.bounds xRadius:r yRadius:r];
   if (pro) {
-    [[NSColor colorWithCalibratedRed:27.0/255.0 green:34.0/255.0 blue:44.0/255.0 alpha:1.0] setFill];
+    [[NSColor colorWithCalibratedRed:27.0/255.0 green:34.0/255.0 blue:44.0/255.0 alpha:0.55] setFill]; // 液态玻璃：半透深色胶囊
     [path fill];
     path.lineWidth = 1.0;
-    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.14] setStroke];
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.22] setStroke];
     [path stroke];
   } else {
     [[NSColor colorWithCalibratedRed:1.0 green:0.37 blue:0.34 alpha:1.0] setFill];
@@ -1541,6 +1560,12 @@ static NSString *ResolveAppPath(NSString *target) {
   self.windowTitleLabel.toolTip = @"双击重命名分组";
   [cv addSubview:self.windowTitleLabel];
 
+  self.groupCountLabel = [NSTextField labelWithString:@""];
+  self.groupCountLabel.font = [NSFont monospacedDigitSystemFontOfSize:11 weight:NSFontWeightMedium];
+  self.groupCountLabel.textColor = ThemeHint(gTheme);
+  self.groupCountLabel.hidden = YES;
+  [cv addSubview:self.groupCountLabel];
+
 
   CGFloat btnSize = 30.0;
 
@@ -2053,12 +2078,13 @@ static NSString *ResolveAppPath(NSString *target) {
   NSInteger cols = [self displayColumns];
   CGFloat W = self.scroll ? MAX(200, self.scroll.contentSize.width) : (480 - 32);
   CGFloat cellW = floor(W / cols);
-  CGFloat rowH = icons ? MAX(72.0, MIN(cellW, 96.0)) : (gTheme == 4 ? 44.0 : 56.0); // C 主题：紧凑行
+  CGFloat rowH = icons ? ((gTheme == 4) ? MAX(84.0, MIN(cellW, 108.0)) : MAX(72.0, MIN(cellW, 96.0)))
+                       : (gTheme == 4 ? 54.0 : 56.0); // 皮肤4第二轮回调：行高 54，紧凑靠间距/边框，不靠缩小图标文字
   NSInteger rowCount = (self.items.count + cols - 1) / (cols > 0 ? cols : 1);
   self.listContainer.frame = NSMakeRect(0, 0, W, MAX(rowCount * rowH, 10));
 
   BOOL narrow = (cellW < 250);
-  NSFont *f = (gTheme == 4) ? [NSFont systemFontOfSize:(narrow ? 13.5 : 14.5) weight:NSFontWeightMedium]
+  NSFont *f = (gTheme == 4) ? [NSFont systemFontOfSize:(narrow ? 16 : 17) weight:NSFontWeightMedium]
                             : [NSFont systemFontOfSize:(narrow ? 16 : 18)];
   NSInteger i = 0;
   for (NSDictionary *it in self.items) {
@@ -2080,7 +2106,8 @@ static NSString *ResolveAppPath(NSString *target) {
     CGFloat customSz = cfg[@"size"] ? [cfg[@"size"] doubleValue] : 0;
     CGFloat customCorner = cfg[@"corner"] ? [cfg[@"corner"] doubleValue] : 0;
     if (icons) {
-      CGFloat sz = customSz > 0 ? customSz : MIN(cell.size.width * 0.62, MIN(cell.size.height * 0.72, 64.0));
+      CGFloat sz = customSz > 0 ? customSz : ((gTheme == 4) ? MIN(cell.size.width * 0.68, MIN(cell.size.height * 0.80, 76.0))
+                                                            : MIN(cell.size.width * 0.62, MIN(cell.size.height * 0.72, 64.0))); // 皮肤4：纯图标加大
       sz = MAX(24.0, sz);
       NSRect iconFrame = NSMakeRect((cell.size.width - sz)/2.0 - 0.6, (cell.size.height - sz)/2.0 - 0.6, sz + 1.2, sz + 1.2);
       AppIconView *iv = [[AppIconView alloc] initWithFrame:iconFrame];
@@ -2100,7 +2127,7 @@ static NSString *ResolveAppPath(NSString *target) {
       i++;
       continue;
     }
-    CGFloat iconSize = (gTheme == 4) ? (narrow ? 26 : 30) : (narrow ? 34 : 40);
+    CGFloat iconSize = (gTheme == 4) ? (narrow ? 38 : 44) : (narrow ? 34 : 40); // 皮肤4第二轮回调：多列 38 / 单列 44，不低于原版
     CGFloat iconX = narrow ? 12 : 20;
     if (customSz > 0) iconSize = MAX(24.0, MIN(customSz, rowH - 10));
     CGFloat textX = iconX + iconSize + (narrow ? 8 : 14);
@@ -2108,7 +2135,7 @@ static NSString *ResolveAppPath(NSString *target) {
     lab.font = f;
     lab.textColor = ThemeText(gTheme);
     lab.lineBreakMode = NSLineBreakByTruncatingTail;
-    lab.frame = NSMakeRect(textX, (rowH-24)/2.0, MAX(40, cell.size.width - textX - 8), 24);
+    lab.frame = NSMakeRect(textX, (rowH-24)/2.0, MAX(40, cell.size.width - textX - ((gTheme == 4) ? 26 : 8)), 24);
     AppIconView *iv = [[AppIconView alloc] initWithFrame:NSMakeRect(iconX, (rowH-iconSize)/2, iconSize, iconSize)];
     iv.cornerRatio = customCorner;
     [row addSubview:iv];
@@ -2119,6 +2146,7 @@ static NSString *ResolveAppPath(NSString *target) {
     [self.rows addObject:row];
     i++;
   }
+  if (self.groupCountLabel) self.groupCountLabel.stringValue = [NSString stringWithFormat:@"%ld 个应用", (long)self.items.count];
   [self.listContainer setNeedsDisplay:YES];
   self.scroll.documentView = self.listContainer;
   [self loadIconsFrom:0];
@@ -2342,13 +2370,24 @@ static NSString *ResolveAppPath(NSString *target) {
   cv.layer.masksToBounds = (radius > 0.5);
 
   // 标题胶囊（随可用宽度收窄）
-  NSFont *tf = [NSFont systemFontOfSize:20 weight:NSFontWeightSemibold];
+  NSFont *tf = [NSFont systemFontOfSize:(gTheme == 4 ? 16 : 20) weight:NSFontWeightSemibold];
   NSDictionary *tattrs = @{NSFontAttributeName: tf};
   CGFloat tw = [self.windowTitleLabel.title sizeWithAttributes:tattrs].width + 44;
   tw = MIN(tw, MAX(80, rw - 24));
-  CGFloat th = 32;
+  CGFloat th = (gTheme == 4) ? 28 : 32;
   self.windowTitleLabel.titleFont = tf;
   self.windowTitleLabel.frame = NSMakeRect(ox + (rw - tw)/2.0, oy + rh - 48, tw, th);
+  if (self.groupCountLabel) { // 皮肤4：标题右侧等宽小字计数（如「14 个应用」），紧凑一行头部
+    self.groupCountLabel.hidden = (gTheme != 4);
+    self.groupCountLabel.stringValue = [NSString stringWithFormat:@"%ld 个应用", (long)self.items.count];
+    self.groupCountLabel.textColor = ThemeHint(gTheme);
+    NSRect pf = self.windowTitleLabel.frame;
+    self.groupCountLabel.frame = NSMakeRect(NSMaxX(pf) + 10, pf.origin.y + (pf.size.height - 16) / 2.0, 90, 16);
+  }
+  if (self.searchField && gTheme == 4) { // 皮肤4：搜索框放大置顶，占窗口主体宽度（其他皮肤保持原始帧不动）
+    CGFloat sfw = MIN(rw - 64, 600);
+    self.searchField.frame = NSMakeRect(ox + (rw - sfw) / 2.0, oy + rh - 58, sfw, 40);
+  }
 
   if (self.pinBtn) self.pinBtn.frame = NSMakeRect(ox + rw - 14 - 28, oy + rh - 34, 28, 28);
   if (self.countdownLabel) self.countdownLabel.frame = NSMakeRect(ox + rw - 14 - 28 - 8 - 150, oy + rh - 34 + 4, 150, 20);
@@ -2395,10 +2434,11 @@ static NSString *ResolveAppPath(NSString *target) {
     self.hintLabel.frame = NSMakeRect(ox + 12, oy + 72, MAX(40, rw - 24), 20);
     self.hintLabel.maximumNumberOfLines = 1;
   } else {
-    self.hintLabel.font = [NSFont systemFontOfSize:10.5];
+    self.hintLabel.font = (gTheme == 4) ? [NSFont monospacedDigitSystemFontOfSize:10.5 weight:NSFontWeightRegular] : [NSFont systemFontOfSize:10.5];
     self.scroll.frame = NSMakeRect(ox + 16, oy + 76, rw - 32, MAX(40, rh - 100 - 76));
-    self.hintLabel.frame = NSMakeRect(ox + 96, oy + 10, MAX(40, rw - 192), 34);
-    self.hintLabel.maximumNumberOfLines = 2;
+    self.hintLabel.frame = (gTheme == 4) ? NSMakeRect(ox + 96, oy + 21, MAX(40, rw - 192), 22)
+                                         : NSMakeRect(ox + 96, oy + 10, MAX(40, rw - 192), 34);
+    self.hintLabel.maximumNumberOfLines = (gTheme == 4) ? 1 : 2;
   }
   [self.scroll layoutSubtreeIfNeeded];
   self.cancelBtn.frame = NSMakeRect(ox + 16, oy + 10, 56, 56);
@@ -2825,13 +2865,13 @@ static NSString *ResolveAppPath(NSString *target) {
   NSWindow *w = self.window;
   if (!w) return;
   NSView *cv = w.contentView;
-  BOOL transparent = (gTheme == 2 || gTheme == 3);
+  BOOL transparent = (gTheme == 2 || gTheme == 3 || gTheme == 4); // 皮肤4第二轮：窗口底改毛玻璃
   w.opaque = !transparent;
   w.backgroundColor = transparent ? [NSColor clearColor] : ThemeBG(gTheme);
   if (cv.layer) cv.layer.backgroundColor = transparent ? [NSColor clearColor].CGColor : ThemeBG(gTheme).CGColor;
   w.alphaValue = (gTheme == 2) ? gGlassAlpha : 1.0;
 
-  if (gTheme == 2 && !self.vibrancy) {
+  if ((gTheme == 2 || gTheme == 4) && !self.vibrancy) {
     self.vibrancy = [[NSVisualEffectView alloc] initWithFrame:cv.bounds];
     self.vibrancy.material = NSVisualEffectMaterialUnderWindowBackground;
     self.vibrancy.blendingMode = NSVisualEffectBlendingModeBehindWindow;
@@ -2842,7 +2882,7 @@ static NSString *ResolveAppPath(NSString *target) {
     self.backdrop = [[BackdropView alloc] initWithFrame:cv.bounds];
     [cv addSubview:self.backdrop positioned:NSWindowBelow relativeTo:nil];
   }
-  self.vibrancy.hidden = (gTheme != 2);
+  self.vibrancy.hidden = (gTheme != 2 && gTheme != 4);
   self.backdrop.hidden = (gTheme != 3);
   [self sendBackgroundToBack];
   if (gTheme == 3 && gImgPath.length > 0) {
@@ -2868,9 +2908,9 @@ static NSString *ResolveAppPath(NSString *target) {
     w.hasShadow = YES;
   }
 
-  BOOL solid = (gTheme == 0 || gTheme == 1 || gTheme == 4);
-  self.scroll.drawsBackground = solid;
-  self.scroll.backgroundColor = solid ? ThemeBG(gTheme) : [NSColor clearColor];
+  BOOL solid = (gTheme == 0 || gTheme == 1);
+  self.scroll.drawsBackground = solid || gTheme == 4;
+  self.scroll.backgroundColor = solid ? ThemeBG(gTheme) : (gTheme == 4 ? [NSColor colorWithCalibratedRed:14.0/255.0 green:17.0/255.0 blue:22.0/255.0 alpha:0.45] : [NSColor clearColor]); // 皮肤4：列表区盖一层半透深 tint，让毛玻璃带透光感
   self.listContainer.wantsLayer = YES;
   if (self.listContainer.layer) self.listContainer.layer.backgroundColor = [NSColor clearColor].CGColor;
 
@@ -2878,19 +2918,34 @@ static NSString *ResolveAppPath(NSString *target) {
   self.hintLabel.textColor = ThemeHint(gTheme);
   self.hintLabel.font = (gTheme == 4) ? [NSFont monospacedDigitSystemFontOfSize:11 weight:NSFontWeightRegular]
                                       : [NSFont systemFontOfSize:11];
+  self.hintLabel.wantsLayer = YES;
+  if (self.hintLabel.layer) { // 皮肤4：底部提示做薄玻璃条；其他皮肤清除
+    if (gTheme == 4) {
+      self.hintLabel.layer.backgroundColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.06].CGColor;
+      self.hintLabel.layer.cornerRadius = 10;
+      self.hintLabel.layer.borderWidth = 1;
+      self.hintLabel.layer.borderColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.10].CGColor;
+    } else {
+      self.hintLabel.layer.backgroundColor = [NSColor clearColor].CGColor;
+      self.hintLabel.layer.borderWidth = 0;
+    }
+  }
   if (self.scroll.layer) self.scroll.layer.cornerRadius = (gTheme == 4) ? 6 : 12; // C 主题低圆角
   if (self.searchField) { // C 主题：搜索框做视觉主角（方形、深底、大一号字）；其他主题恢复原圆角样式
     if (gTheme == 4) {
-      self.searchField.bezelStyle = NSTextFieldSquareBezel;
+      self.searchField.bezelStyle = NSTextFieldRoundedBezel;
       self.searchField.drawsBackground = YES;
-      self.searchField.backgroundColor = [NSColor colorWithCalibratedRed:21.0/255.0 green:26.0/255.0 blue:33.0/255.0 alpha:1.0];
+      self.searchField.backgroundColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.10]; // 液态玻璃胶囊：半透 + 高光边 + 大圆角
       self.searchField.textColor = ThemeText(gTheme);
-      self.searchField.font = [NSFont systemFontOfSize:15 weight:NSFontWeightMedium];
+      self.searchField.font = [NSFont systemFontOfSize:17 weight:NSFontWeightMedium];
+      self.searchField.wantsLayer = YES;
+      if (self.searchField.layer) { self.searchField.layer.borderWidth = 1; self.searchField.layer.borderColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.28].CGColor; self.searchField.layer.cornerRadius = 20; }
     } else {
       self.searchField.bezelStyle = NSTextFieldRoundedBezel;
       self.searchField.drawsBackground = YES;
       self.searchField.textColor = [NSColor textColor];
       self.searchField.font = [NSFont systemFontOfSize:14];
+      if (self.searchField.layer) self.searchField.layer.borderWidth = 0;
     }
   }
   for (RowView *r in self.rows) {
@@ -2913,7 +2968,7 @@ static NSString *ResolveAppPath(NSString *target) {
   if (!self.settingsExpanded) self.settingsExpanded = [NSMutableSet set];
   self.settingsTree = @[
     @{@"title":@"窗口背景", @"children":@[
-      @{@"title":@"专业仪表盘（默认）", @"sel":@"skinPro:"},
+      @{@"title":@"液态玻璃仪表盘（默认）", @"sel":@"skinPro:"},
       @{@"title":@"纯白风格", @"sel":@"skinWhite:"},
       @{@"title":@"纯黑风格", @"sel":@"skinBlack:"},
       @{@"title":@"质感玻璃", @"children":@[@{@"title":@"玻璃透明度…", @"sel":@"showGlassPanel:"}]},

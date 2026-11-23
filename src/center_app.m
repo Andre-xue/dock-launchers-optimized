@@ -456,16 +456,19 @@ static BOOL DLThemeIsDark(void) {
 static BOOL DLThemeIsPro(void) {
   return [[NSUserDefaults standardUserDefaults] integerForKey:@"centerTheme"] == 3;
 }
-static NSColor *DLProPageBG(void) { return [NSColor colorWithCalibratedRed:14.0/255.0 green:17.0/255.0 blue:22.0/255.0 alpha:1.0]; }   // #0E1116
-static NSColor *DLProCardBG(void) { return [NSColor colorWithCalibratedRed:21.0/255.0 green:26.0/255.0 blue:33.0/255.0 alpha:1.0]; }   // #151A21
-static NSColor *DLProSidebarBG(void) { return [NSColor colorWithCalibratedRed:10.0/255.0 green:13.0/255.0 blue:17.0/255.0 alpha:1.0]; } // #0A0D11
+static NSColor *DLProPageBG(void) { return [NSColor colorWithCalibratedRed:14.0/255.0 green:17.0/255.0 blue:22.0/255.0 alpha:0.62]; }   // 液态玻璃：#0E1116 半透 tint，压在窗口毛玻璃上
+static NSColor *DLProCardBG(void) { return [NSColor colorWithCalibratedRed:27.0/255.0 green:36.0/255.0 blue:50.0/255.0 alpha:0.60]; }   // 液态玻璃面板：蓝灰半透 #1B2432@0.60
+static NSColor *DLProSidebarBG(void) { return [NSColor colorWithCalibratedRed:10.0/255.0 green:13.0/255.0 blue:17.0/255.0 alpha:0.55]; } // 液态玻璃：侧边栏 tint 更透
+static NSColor *DLAccent(void) { return [NSColor colorWithCalibratedRed:47.0/255.0 green:129.0/255.0 blue:247.0/255.0 alpha:1.0]; } // C 强调蓝 #2F81F7
+static NSColor *DLPinAccent(void) { return DLThemeIsPro() ? DLAccent() : [NSColor systemOrangeColor]; } // 主题3时图钉强调色统一为蓝，其他主题保持原橙
+static CGFloat DLSidebarWidth(void) { return DLThemeIsPro() ? 176.0 : 240.0; } // 主题3侧边栏收窄约 27%
 // 前向声明：这三个取色函数定义在文件后部，但前部窗口构建代码已在调用（原代码同此模式）
 static NSColor *PageBackgroundForAppearance(NSAppearance *ap);
 static NSColor *CardBackgroundForAppearance(NSAppearance *ap);
 static NSColor *SidebarBackgroundForAppearance(NSAppearance *ap);
 
 static NSColor *DLButtonBackground(void) {
-  if (DLThemeIsPro()) return [NSColor colorWithCalibratedRed:27.0/255.0 green:34.0/255.0 blue:44.0/255.0 alpha:1.0]; // #1B222C
+  if (DLThemeIsPro()) return [NSColor colorWithCalibratedRed:27.0/255.0 green:34.0/255.0 blue:44.0/255.0 alpha:0.80]; // 液态玻璃：按钮半透
   return DLThemeIsDark() ? [NSColor colorWithCalibratedWhite:0.24 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.975 alpha:1.0];
 }
 
@@ -2448,10 +2451,14 @@ static NSDate *InstallDateForPath(NSString *path) {
     self.layer.cornerRadius = 14;
     self.layer.borderWidth = 1;
     self.layer.borderColor = (dark ? [NSColor colorWithCalibratedWhite:1.0 alpha:0.14] : [NSColor colorWithCalibratedWhite:0.93 alpha:1.0]).CGColor;
-    if (themeVal == 3) { // C 专业仪表盘：卡片深灰 #151A21 + 细边框 + 低圆角
-      self.layer.backgroundColor = DLProCardBG().CGColor;
-      self.layer.borderColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.10].CGColor;
-      self.layer.cornerRadius = 8;
+    if (themeVal == 3) { // C 第二轮：指标列去卡片化，融入顶部指标带（透明底无边框，靠强调色条与分隔线区分）
+      self.layer.backgroundColor = [NSColor clearColor].CGColor;
+      self.layer.borderWidth = 0;
+      self.layer.cornerRadius = 0;
+      NSView *tick = [[NSView alloc] initWithFrame:NSMakeRect(12, frame.size.height - 40, 22, 3)];
+      tick.wantsLayer = YES; tick.layer.backgroundColor = accent.CGColor; [self addSubview:tick];
+      NSView *div = [[NSView alloc] initWithFrame:NSMakeRect(frame.size.width - 1, 24, 1, frame.size.height - 48)];
+      div.wantsLayer = YES; div.layer.backgroundColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.07].CGColor; [self addSubview:div];
     }
     CGFloat w = frame.size.width;
     _titleLabel = [NSTextField labelWithString:title];
@@ -2475,9 +2482,9 @@ static NSDate *InstallDateForPath(NSString *path) {
     _detailLabel.lineBreakMode = NSLineBreakByWordWrapping;
     _detailLabel.usesSingleLineMode = NO;
     _detailLabel.cell.wraps = YES;
-    _detailLabel.frame = NSMakeRect(12, 14, w - 24, 48);
+    _detailLabel.frame = (themeVal == 3) ? NSMakeRect(12, 8, w - 24, 42) : NSMakeRect(12, 14, w - 24, 48);
     [self addSubview:_detailLabel];
-    _bar = [[BarChartView alloc] initWithFrame:NSMakeRect(10, 70, w - 20, frame.size.height - 150)];
+    _bar = [[BarChartView alloc] initWithFrame:(themeVal == 3) ? NSMakeRect(10, 56, w - 20, frame.size.height - 128) : NSMakeRect(10, 70, w - 20, frame.size.height - 150)];
     _bar.barColor = accent;
     [self addSubview:_bar];
   }
@@ -4052,7 +4059,7 @@ static void HideDockHoverTip(void) {
       b.title = navTitles[i];
       b.imagePosition = NSImageLeft;
       b.alignment = NSTextAlignmentLeft;
-      b.frame = NSMakeRect(14, 521 - i * 92.4, 212, 40);
+      b.frame = DLThemeIsPro() ? NSMakeRect(10, 521 - i * 60, 156, 36) : NSMakeRect(14, 521 - i * 92.4, 212, 40);
     }
   }
   if (collapse) {
@@ -4074,9 +4081,10 @@ static void HideDockHoverTip(void) {
   [NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
     ctx.duration = 0.22;
     NSRect win = weakSelf.window.contentView.bounds;
-    weakSelf.sideView.animator.frame = NSMakeRect(0, 0, collapse ? 44 : 240, win.size.height);
-    weakSelf.contentScroll.animator.frame = NSMakeRect(collapse ? 44 : 240, 0, win.size.width - (collapse ? 44 : 240), win.size.height);
-    weakSelf.sidebarToggle.animator.frame = collapse ? NSMakeRect(6, 20, 32, 32) : NSMakeRect(14, 20, 212, 36);
+    CGFloat expW = DLSidebarWidth();
+    weakSelf.sideView.animator.frame = NSMakeRect(0, 0, collapse ? 44 : expW, win.size.height);
+    weakSelf.contentScroll.animator.frame = NSMakeRect(collapse ? 44 : expW, 0, win.size.width - (collapse ? 44 : expW), win.size.height);
+    weakSelf.sidebarToggle.animator.frame = collapse ? NSMakeRect(6, 20, 32, 32) : (DLThemeIsPro() ? NSMakeRect(10, 20, expW - 20, 32) : NSMakeRect(14, 20, 212, 36));
   } completionHandler:^{
     if (collapse) {
       for (NSView *v in weakSelf.sideView.subviews) {
@@ -4139,14 +4147,14 @@ static void HideDockHoverTip(void) {
   pin.bordered = NO;
   pin.imageScaling = NSImageScaleProportionallyDown;
   pin.imagePosition = NSImageOnly;
-  pin.contentTintColor = [NSColor systemOrangeColor];
+  pin.contentTintColor = DLPinAccent();
   pin.toolTip = @"钉住窗口";
   pin.wantsLayer = YES;
   pin.layer.cornerRadius = 8;
-  pin.layer.backgroundColor = [[NSColor systemOrangeColor] colorWithAlphaComponent:0.16].CGColor;
+  pin.layer.backgroundColor = [DLPinAccent() colorWithAlphaComponent:0.16].CGColor;
   pin.layer.borderWidth = 1;
-  pin.layer.borderColor = [[NSColor systemOrangeColor] colorWithAlphaComponent:0.65].CGColor;
-  pin.layer.shadowColor = [NSColor systemOrangeColor].CGColor;
+  pin.layer.borderColor = [DLPinAccent() colorWithAlphaComponent:0.65].CGColor;
+  pin.layer.shadowColor = DLPinAccent().CGColor;
   pin.layer.shadowOpacity = 0.28;
   pin.layer.shadowRadius = 4;
   pin.layer.shadowOffset = CGSizeMake(0, -1);
@@ -4206,8 +4214,8 @@ static void HideDockHoverTip(void) {
     [self setCloseButtonsInWindow:w enabled:NO];
     sender.image = [NSImage imageWithSystemSymbolName:@"pin.fill" accessibilityDescription:@"已钉住"];
     sender.contentTintColor = [NSColor whiteColor];
-    sender.layer.backgroundColor = [NSColor systemOrangeColor].CGColor;
-    sender.layer.borderColor = [NSColor systemOrangeColor].CGColor;
+    sender.layer.backgroundColor = DLPinAccent().CGColor;
+    sender.layer.borderColor = DLPinAccent().CGColor;
     sender.layer.shadowOpacity = 0.5;
     sender.toolTip = @"已钉住：关闭 / ESC 已禁用";
   } else {
@@ -4215,9 +4223,9 @@ static void HideDockHoverTip(void) {
     NSInteger base = [objc_getAssociatedObject(w, "DLCenterBaseLevel") integerValue];
     w.level = base;
     sender.image = [NSImage imageWithSystemSymbolName:@"pin.fill" accessibilityDescription:@"钉住"];
-    sender.contentTintColor = [NSColor systemOrangeColor];
-    sender.layer.backgroundColor = [[NSColor systemOrangeColor] colorWithAlphaComponent:0.16].CGColor;
-    sender.layer.borderColor = [[NSColor systemOrangeColor] colorWithAlphaComponent:0.65].CGColor;
+    sender.contentTintColor = DLPinAccent();
+    sender.layer.backgroundColor = [DLPinAccent() colorWithAlphaComponent:0.16].CGColor;
+    sender.layer.borderColor = [DLPinAccent() colorWithAlphaComponent:0.65].CGColor;
     sender.layer.shadowOpacity = 0.28;
     sender.toolTip = @"钉住窗口（禁用关闭）";
   }
@@ -4426,7 +4434,7 @@ static OSStatus TranslationHotKeyHandler(EventHandlerCallRef nextHandler, EventR
   self.window.titleVisibility = NSWindowTitleHidden;
   self.window.delegate = self;
   self.window.collectionBehavior = NSWindowCollectionBehaviorFullScreenNone;
-  self.centerTitleLabel = [self label:[NSString stringWithFormat:@"DockLaunchers 控制台  v%@", [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0"] size:16 bold:YES color:[NSColor systemOrangeColor]];
+  self.centerTitleLabel = [self label:[NSString stringWithFormat:@"DockLaunchers 控制台  v%@", [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0"] size:16 bold:YES color:(DLThemeIsPro() ? [NSColor colorWithCalibratedWhite:0.93 alpha:1.0] : [NSColor systemOrangeColor])]; // 主题3标题改近白，其他主题保持原橙
   self.centerTitleLabel.alignment = NSTextAlignmentCenter;
   [self.window.contentView.superview addSubview:self.centerTitleLabel];
   [self layoutCenterTitle];
@@ -4440,13 +4448,13 @@ static OSStatus TranslationHotKeyHandler(EventHandlerCallRef nextHandler, EventR
   NSView *root = self.window.contentView;
 
   // 侧边栏
-  NSView *side = [[NSView alloc] initWithFrame:NSMakeRect(0,0,240,660)];
+  NSView *side = [[NSView alloc] initWithFrame:NSMakeRect(0,0,DLSidebarWidth(),660)];
   side.wantsLayer = YES;
   side.identifier = @"DLSidebar";
   side.layer.backgroundColor = SidebarBackgroundForAppearance(NSApp.effectiveAppearance).CGColor;
   side.autoresizingMask = NSViewHeightSizable;
   [root addSubview:side];
-  NSImageView *avatar = [[NSImageView alloc] initWithFrame:NSMakeRect(84, 580.5, 72, 72)];
+  NSImageView *avatar = [[NSImageView alloc] initWithFrame:DLThemeIsPro() ? NSMakeRect(64, 592.5, 48, 48) : NSMakeRect(84, 580.5, 72, 72)];
   avatar.image = [self characterImage:72];
   [side addSubview:avatar];
 
@@ -4457,10 +4465,10 @@ static OSStatus TranslationHotKeyHandler(EventHandlerCallRef nextHandler, EventR
   for (NSInteger i = 0; i < titles.count; i++) {
     NSButton *b = [NSButton buttonWithTitle:titles[i] target:self action:@selector(sideClicked:)];
     b.tag = i;
-    b.frame = NSMakeRect(14, y, 212, 48);
+    b.frame = DLThemeIsPro() ? NSMakeRect(10, y, 156, 36) : NSMakeRect(14, y, 212, 48);
     b.bordered = NO;
     b.alignment = NSTextAlignmentLeft;
-    b.font = DLDisplayFont(14, YES);
+    b.font = DLDisplayFont(DLThemeIsPro() ? 13 : 14, YES);
     NSImage *navIcon = [[NSImage imageWithSystemSymbolName:symbols[i] accessibilityDescription:titles[i]] imageWithSymbolConfiguration:[NSImageSymbolConfiguration configurationWithPointSize:18 weight:NSFontWeightSemibold]];
     navIcon.template = YES;
     b.image = navIcon;
@@ -4471,13 +4479,13 @@ static OSStatus TranslationHotKeyHandler(EventHandlerCallRef nextHandler, EventR
     b.toolTip = titles[i];
     [side addSubview:b];
     [btns addObject:b];
-    y -= 92.4;
+    y -= DLThemeIsPro() ? 60 : 92.4;
   }
   self.sideLive = btns[0]; self.sideGroups = btns[1]; self.sideAI = btns[2]; self.sideDisk = btns[3]; self.sideUninstall = btns[4]; self.sideSettings = btns[5];
 
 
   self.sideView = side;
-  self.contentScroll = [[NSScrollView alloc] initWithFrame:NSMakeRect(240, 0, 750, 660)];
+  self.contentScroll = [[NSScrollView alloc] initWithFrame:NSMakeRect(DLSidebarWidth(), 0, 990 - DLSidebarWidth(), 660)];
   self.contentScroll.autoresizingMask = NSViewWidthSizable|NSViewHeightSizable;
   self.contentScroll.hasVerticalScroller = YES;
   self.contentScroll.hasHorizontalScroller = YES;
@@ -4490,7 +4498,7 @@ static OSStatus TranslationHotKeyHandler(EventHandlerCallRef nextHandler, EventR
   self.contentScroll.documentView = self.content;
   [root addSubview:self.contentScroll];
   self.uiZoom = 1.0;
-  self.sidebarToggle = [[ColorHoverButton alloc] initWithFrame:NSMakeRect(14, 20, 212, 36)];
+  self.sidebarToggle = [[ColorHoverButton alloc] initWithFrame:DLThemeIsPro() ? NSMakeRect(10, 20, 156, 32) : NSMakeRect(14, 20, 212, 36)];
   self.sidebarToggle.title = @"收起侧边栏";
   self.sidebarToggle.hoverColor = [NSColor systemBrownColor];
   self.sidebarToggle.target = self;
@@ -4498,6 +4506,24 @@ static OSStatus TranslationHotKeyHandler(EventHandlerCallRef nextHandler, EventR
   self.sidebarToggle.toolTip = @"收起 / 展开侧边栏";
   [self.sidebarToggle applyColor:DLButtonBackground() textColor:[NSColor labelColor]];
   [side addSubview:self.sidebarToggle];
+
+  // 液态玻璃（仅主题3显示）：窗口底层 UnderWindowBackground 毛玻璃 + 侧边栏 Sidebar 毛玻璃，均 BehindWindow 采样
+  NSVisualEffectView *glassWin = [[NSVisualEffectView alloc] initWithFrame:root.bounds];
+  glassWin.identifier = @"DLGlassWindow";
+  glassWin.material = NSVisualEffectMaterialUnderWindowBackground;
+  glassWin.blendingMode = NSVisualEffectBlendingModeBehindWindow;
+  glassWin.state = NSVisualEffectStateActive;
+  glassWin.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+  glassWin.hidden = !DLThemeIsPro();
+  [root addSubview:glassWin positioned:NSWindowBelow relativeTo:nil];
+  NSVisualEffectView *glassSide = [[NSVisualEffectView alloc] initWithFrame:side.bounds];
+  glassSide.identifier = @"DLGlassSidebar";
+  glassSide.material = NSVisualEffectMaterialSidebar;
+  glassSide.blendingMode = NSVisualEffectBlendingModeBehindWindow;
+  glassSide.state = NSVisualEffectStateActive;
+  glassSide.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+  glassSide.hidden = !DLThemeIsPro();
+  [side addSubview:glassSide positioned:NSWindowBelow relativeTo:nil];
 
   [self buildLiveView];
   [self showSection:0];
@@ -4618,14 +4644,19 @@ static OSStatus TranslationHotKeyHandler(EventHandlerCallRef nextHandler, EventR
   for (NSInteger i = 0; i < btns.count; i++) {
     NSButton *b = btns[i];
     BOOL on = (i == idx);
-    NSColor *accent = navColors[i];
+    BOOL proNav = DLThemeIsPro();
+    NSColor *accent = proNav ? DLAccent() : navColors[i]; // 主题3：六个入口选中色统一为青蓝，不再各带一色
     BOOL darkNav = ThemeIsDark(NSApp.effectiveAppearance);
     NSColor *normalText = darkNav ? [NSColor colorWithCalibratedWhite:0.92 alpha:1.0] : [NSColor labelColor];
-    b.layer.backgroundColor = on ? [accent colorWithAlphaComponent:0.14].CGColor : [NSColor clearColor].CGColor;
-    b.contentTintColor = on ? accent : (darkNav ? [NSColor colorWithCalibratedWhite:0.78 alpha:1.0] : [NSColor secondaryLabelColor]);
-    NSFont *font = DLDisplayFont(14, on);
+    b.layer.backgroundColor = on ? [accent colorWithAlphaComponent:(proNav ? 0.22 : 0.14)].CGColor : [NSColor clearColor].CGColor;
+    if (proNav) { // 液态玻璃：选中项做玻璃胶囊，加高光描边
+      b.layer.borderWidth = on ? 1 : 0;
+      if (on) b.layer.borderColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.25].CGColor;
+    }
+    b.contentTintColor = on ? (proNav ? [NSColor whiteColor] : accent) : (darkNav ? [NSColor colorWithCalibratedWhite:0.78 alpha:1.0] : [NSColor secondaryLabelColor]);
+    NSFont *font = DLDisplayFont(proNav ? 13 : 14, on);
     NSMutableParagraphStyle *ps = [[NSMutableParagraphStyle alloc] init];
-    b.attributedTitle = [[NSAttributedString alloc] initWithString:b.title ?: @"" attributes:@{NSFontAttributeName: font, NSForegroundColorAttributeName: (on ? accent : normalText), NSParagraphStyleAttributeName: ps}];
+    b.attributedTitle = [[NSAttributedString alloc] initWithString:b.title ?: @"" attributes:@{NSFontAttributeName: font, NSForegroundColorAttributeName: (on ? (proNav ? [NSColor whiteColor] : accent) : normalText), NSParagraphStyleAttributeName: ps}];
   }
   NSView *v = [self viewForSection:idx];
   v.autoresizingMask = NSViewNotSizable;
@@ -4795,6 +4826,32 @@ static OSStatus TranslationHotKeyHandler(EventHandlerCallRef nextHandler, EventR
   NSArray *keys = @[@"memory", @"disk", @"cpu", @"gpu", @"power", @"network"];
   NSArray *colors = @[[NSColor systemGreenColor], [NSColor systemOrangeColor], [NSColor systemBlueColor],
                       [NSColor systemPurpleColor], [NSColor systemPinkColor], [NSColor systemTealColor]];
+  if (DLThemeIsPro()) { // 液态玻璃指标带：macOS 26 运行时优先用真 NSGlassEffectView（动态取类，不依赖编译期 SDK），否则回退半透玻璃面板
+    NSView *strip = nil;
+    Class glassCls = NSClassFromString(@"NSGlassEffectView");
+    if (glassCls) {
+      @try {
+        NSView *gv = [[glassCls alloc] initWithFrame:NSMakeRect(12, 249, 726, 332)];
+        [gv setValue:@14 forKey:@"cornerRadius"];
+        [gv setValue:[NSColor colorWithCalibratedRed:21.0/255.0 green:26.0/255.0 blue:33.0/255.0 alpha:0.35] forKey:@"tintColor"];
+        strip = gv;
+      } @catch (NSException *e) { strip = nil; }
+    }
+    if (!strip) {
+      NSView *sp = [[NSView alloc] initWithFrame:NSMakeRect(12, 249, 726, 332)];
+      sp.wantsLayer = YES;
+      sp.layer.backgroundColor = DLProCardBG().CGColor;
+      sp.layer.cornerRadius = 14;
+      sp.layer.borderWidth = 1;
+      sp.layer.borderColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.20].CGColor;
+      sp.layer.shadowColor = [NSColor blackColor].CGColor;
+      sp.layer.shadowOpacity = 0.28;
+      sp.layer.shadowRadius = 12;
+      sp.layer.shadowOffset = CGSizeMake(0, -4);
+      strip = sp;
+    }
+    [v addSubview:strip];
+  }
   CGFloat gap = 6, left = 18, width = 100;
   NSMutableArray *cols = [NSMutableArray array];
   for (NSInteger i = 0; i < 6; i++) {
@@ -5113,7 +5170,7 @@ static NSColor *CardBackgroundForAppearance(NSAppearance *ap) {
   return dark ? [NSColor colorWithCalibratedWhite:0.13 alpha:1.0] : [NSColor colorWithCalibratedWhite:1.0 alpha:1.0];
 }
 static NSColor *CardBorderForAppearance(NSAppearance *ap) {
-  if (DLThemeIsPro()) return [NSColor colorWithCalibratedWhite:1.0 alpha:0.10]; // C 主题细边框
+  if (DLThemeIsPro()) return [NSColor colorWithCalibratedWhite:1.0 alpha:0.20]; // 液态玻璃：高光描边
   BOOL dark = ThemeIsDark(ap);
   return dark ? [NSColor colorWithCalibratedWhite:1.0 alpha:0.12] : [NSColor colorWithCalibratedWhite:0.0 alpha:0.08];
 }
@@ -5122,7 +5179,7 @@ static NSColor *CardBorderForAppearance(NSAppearance *ap) {
   NSView *c = [[NSView alloc] initWithFrame:r];
   c.wantsLayer = YES;
   c.identifier = @"DLCard";
-  c.layer.cornerRadius = DLThemeIsPro() ? 8 : 18; // C 主题低圆角
+  c.layer.cornerRadius = DLThemeIsPro() ? 14 : 18; // 液态玻璃：圆角回到玻璃语言 14（布局压密不变）
   c.layer.backgroundColor = CardBackgroundForAppearance(NSApp.effectiveAppearance).CGColor;
   c.layer.shadowColor = [NSColor blackColor].CGColor;
   c.layer.shadowOpacity = 0.0;
@@ -5130,6 +5187,11 @@ static NSColor *CardBorderForAppearance(NSAppearance *ap) {
   c.layer.shadowOffset = CGSizeMake(0, -4);
   c.layer.borderWidth = 1;
   c.layer.borderColor = CardBorderForAppearance(NSApp.effectiveAppearance).CGColor;
+  if (DLThemeIsPro()) { // 液态玻璃：柔和投影让面板悬浮
+    c.layer.shadowOpacity = 0.28;
+    c.layer.shadowRadius = 12;
+    c.layer.shadowOffset = CGSizeMake(0, -4);
+  }
   return c;
 }
 
@@ -20083,18 +20145,22 @@ static NSArray<NSString *> *ParseCSVLine(NSString *line) {
   sub.frame = NSMakeRect(24, 584, 500, 18); [v addSubview:sub];
 
   CGFloat colX[3] = {24, 264, 504};
-  CGFloat tileW = 222, tileH = 64, gap = 10;
+  CGFloat tileW = 222, tileH = DLThemeIsPro() ? 58 : 64, gap = 10; // 主题3：设置卡片压扁，同屏信息更密
   NSArray *colTitles = @[@"常规", @"同步与文件", @"权限设置"];
   for (NSInteger c = 0; c < 3; c++) {
     NSTextField *ct = [self label:colTitles[c] size:14 bold:YES color:nil];
     ct.frame = NSMakeRect(colX[c], 540, tileW, 20);
+    if (DLThemeIsPro()) { // 主题3：分组标题改小号字距标签
+      NSMutableParagraphStyle *cps = [[NSMutableParagraphStyle alloc] init]; cps.alignment = NSTextAlignmentCenter;
+      ct.attributedStringValue = [[NSAttributedString alloc] initWithString:colTitles[c] attributes:@{NSFontAttributeName: [NSFont systemFontOfSize:11.5 weight:NSFontWeightSemibold], NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.62 alpha:1.0], NSKernAttributeName: @2.0, NSParagraphStyleAttributeName: cps}];
+    }
     ct.alignment = NSTextAlignmentCenter;
     [v addSubview:ct];
   }
   NSView *(^tileAt)(NSInteger, CGFloat) = ^NSView *(NSInteger col, CGFloat y) {
     CGFloat x = col == 0 ? 24 : (col == 1 ? 264 : 504);
     NSView *t = [self cardAt:NSMakeRect(x, y - 34, tileW, tileH)];
-    t.layer.cornerRadius = 12;
+    t.layer.cornerRadius = DLThemeIsPro() ? 14 : 12; // 主题3：覆盖 cardAt 圆角为玻璃语言 14（此前无条件写 12 曾让低圆角不生效，此处显式分主题）
     [v addSubview:t];
     return t;
   };
@@ -20109,7 +20175,7 @@ static NSArray<NSString *> *ParseCSVLine(NSString *line) {
   // 第一列：常规
   NSView *tTheme = tileAt(0, 500); tileLabel(tTheme, @"显示主题");
   self.themePopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(12, 8, tileW - 24, 26) pullsDown:NO];
-  [self.themePopup addItemsWithTitles:@[@"跟随系统", @"亮色", @"暗色", @"专业仪表盘（C）"]];
+  [self.themePopup addItemsWithTitles:@[@"跟随系统", @"亮色", @"暗色", @"液态玻璃仪表盘（C）"]];
   NSInteger tv = [[NSUserDefaults standardUserDefaults] integerForKey:@"centerTheme"];
   [self.themePopup selectItemAtIndex:(tv >= 0 && tv <= 3 ? tv : 0)];
   self.themePopup.target = self; self.themePopup.action = @selector(themeChanged:);
@@ -20366,15 +20432,39 @@ static NSArray<NSString *> *ParseCSVLine(NSString *line) {
   }
   [self applyAppearanceRecursively:self.window.contentView appearance:ap];
   [self refreshThemeColors];
+  [self applySidebarLayout];
   if (self.popover.isShown && self.quickTabs.selectedSegment == 2) [self rebuildQuickAITab];
 }
 
+- (void)applySidebarLayout {
+  if (!self.window || !self.sideView || !self.sideLive || self.sidebarCollapsed) return;
+  BOOL pro = DLThemeIsPro();
+  CGFloat sw = DLSidebarWidth();
+  NSRect win = self.window.contentView.bounds;
+  self.sideView.frame = NSMakeRect(0, 0, sw, win.size.height);
+  if (self.contentScroll) self.contentScroll.frame = NSMakeRect(sw, 0, win.size.width - sw, win.size.height);
+  NSArray *btns = @[self.sideLive, self.sideGroups, self.sideAI, self.sideDisk, self.sideUninstall, self.sideSettings];
+  for (NSInteger i = 0; i < (NSInteger)btns.count; i++) {
+    NSButton *b = btns[i];
+    if (!b) continue;
+    b.frame = pro ? NSMakeRect(10, 521 - i * 60, sw - 20, 36) : NSMakeRect(14, 521 - i * 92.4, 212, 40);
+  }
+  for (NSView *v in self.sideView.subviews) {
+    if ([v isKindOfClass:[NSImageView class]]) { v.frame = pro ? NSMakeRect((sw - 48) / 2.0, 592.5, 48, 48) : NSMakeRect(84, 580.5, 72, 72); break; }
+  }
+  if (self.sidebarToggle) self.sidebarToggle.frame = pro ? NSMakeRect(10, 20, sw - 20, 32) : NSMakeRect(14, 20, 212, 36);
+  [self layoutPageView:self.content.subviews.firstObject];
+}
+
 - (void)refreshThemeColors {
-  self.window.backgroundColor = PageBackgroundForAppearance(NSApp.effectiveAppearance);
+  self.window.backgroundColor = DLThemeIsPro() ? [NSColor clearColor] : PageBackgroundForAppearance(NSApp.effectiveAppearance); // 主题3让窗口底透出毛玻璃
+  for (NSView *v in self.window.contentView.subviews) if ([v.identifier isEqualToString:@"DLGlassWindow"]) v.hidden = !DLThemeIsPro();
+  for (NSView *v in self.sideView.subviews) if ([v.identifier isEqualToString:@"DLGlassSidebar"]) v.hidden = !DLThemeIsPro();
   if (self.contentScroll) self.contentScroll.backgroundColor = PageBackgroundForAppearance(NSApp.effectiveAppearance);
   if (self.content) self.content.layer.backgroundColor = PageBackgroundForAppearance(NSApp.effectiveAppearance).CGColor;
   if (self.sideView) self.sideView.layer.backgroundColor = SidebarBackgroundForAppearance(NSApp.effectiveAppearance).CGColor;
   if (self.statusItem.button) self.statusItem.button.contentTintColor = [NSColor labelColor];
+  if (self.centerTitleLabel) self.centerTitleLabel.textColor = DLThemeIsPro() ? [NSColor colorWithCalibratedWhite:0.93 alpha:1.0] : [NSColor systemOrangeColor];
 }
 
 - (void)uiZoomChanged:(NSPopUpButton *)sender {
@@ -20401,7 +20491,7 @@ static NSArray<NSString *> *ParseCSVLine(NSString *line) {
     [self buildPopover];
   }
   [self showSection:self.section];
-  NSArray *names = @[@"跟随系统", @"亮色", @"暗色"];
+  NSArray *names = @[@"跟随系统", @"亮色", @"暗色", @"液态玻璃仪表盘（C）"];
   [self showToast:[NSString stringWithFormat:@"显示主题：%@", names[tv]]];
 }
 
@@ -21743,25 +21833,31 @@ static NSArray<NSString *> *ParseCSVLine(NSString *line) {
   [rows sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) { return [b[@"cpu"] compare:a[@"cpu"]]; }];
   if (rows.count > 6) [rows removeObjectsInRange:NSMakeRange(6, rows.count - 6)];
   for (NSView *v in [self.quickProcessContainer.subviews copy]) [v removeFromSuperview];
-  CGFloat rowH = 58;
+  CGFloat rowH = DLThemeIsPro() ? 48 : 58; // 主题3：进程行压紧
+  CGFloat startY = 318 - 5 * (58 - rowH);
   for (NSInteger i = 0; i < (NSInteger)rows.count; i++) {
     NSDictionary *p = rows[i];
-    NSView *row = [self cardAt:NSMakeRect(4, 318 - i*rowH, 392, rowH - 6)];
+    NSView *row = [self cardAt:NSMakeRect(4, startY - i*rowH, 392, rowH - 6)];
     [self.quickProcessContainer addSubview:row];
     NSTextField *rank = [self label:[NSString stringWithFormat:@"%ld", (long)(i+1)] size:12 bold:YES color:[NSColor tertiaryLabelColor]];
-    rank.frame = NSMakeRect(10, 16, 20, 18); [row addSubview:rank];
-    NSImageView *iv = [[NSImageView alloc] initWithFrame:NSMakeRect(32, 12, 28, 28)];
+    rank.frame = DLThemeIsPro() ? NSMakeRect(10, 12, 20, 18) : NSMakeRect(10, 16, 20, 18); [row addSubview:rank];
+    NSImageView *iv = [[NSImageView alloc] initWithFrame:DLThemeIsPro() ? NSMakeRect(32, 8, 26, 26) : NSMakeRect(32, 12, 28, 28)];
     iv.image = ProcessIconForPID([p[@"pid"] integerValue], p[@"path"]);
     [row addSubview:iv];
     NSTextField *name = [self label:p[@"name"] size:12 bold:YES color:nil];
     name.lineBreakMode = NSLineBreakByTruncatingTail;
-    name.frame = NSMakeRect(68, 18, 170, 18); [row addSubview:name];
+    name.frame = NSMakeRect(68, DLThemeIsPro() ? 12 : 18, 170, 18); [row addSubview:name];
     NSTextField *cpu = [self label:[NSString stringWithFormat:@"%.1f%%", [p[@"cpu"] doubleValue]] size:11 bold:YES color:[NSColor systemOrangeColor]];
     cpu.alignment = NSTextAlignmentRight;
-    cpu.frame = NSMakeRect(240, 18, 65, 18); [row addSubview:cpu];
+    cpu.frame = NSMakeRect(240, DLThemeIsPro() ? 12 : 18, 65, 18); [row addSubview:cpu];
     NSTextField *mem = [self label:[NSString stringWithFormat:@"%.0f MB", [p[@"mem"] doubleValue]] size:10.5 bold:NO color:[NSColor secondaryLabelColor]];
     mem.alignment = NSTextAlignmentRight;
-    mem.frame = NSMakeRect(305, 18, 78, 18); [row addSubview:mem];
+    mem.frame = NSMakeRect(305, DLThemeIsPro() ? 12 : 18, 78, 18); [row addSubview:mem];
+    if (DLThemeIsPro()) { // 主题3：数值改等宽数字，CPU 数值改强调蓝
+      cpu.font = [NSFont monospacedDigitSystemFontOfSize:11 weight:NSFontWeightBold];
+      cpu.textColor = DLAccent();
+      mem.font = [NSFont monospacedDigitSystemFontOfSize:10.5 weight:NSFontWeightRegular];
+    }
   }
 }
 
@@ -22079,7 +22175,7 @@ static NSArray<NSString *> *ParseCSVLine(NSString *line) {
 - (void)applyPinLook:(NSButton *)b pinned:(BOOL)pinned {
   b.state = pinned ? NSControlStateValueOn : NSControlStateValueOff;
   b.image = [NSImage imageWithSystemSymbolName:(pinned ? @"pin.fill" : @"pin") accessibilityDescription:@"钉住"];
-  b.contentTintColor = pinned ? [NSColor systemOrangeColor] : [NSColor secondaryLabelColor];
+  b.contentTintColor = pinned ? DLPinAccent() : [NSColor secondaryLabelColor];
   b.toolTip = pinned ? @"取消钉住" : @"钉住窗口（保留窗口，不置顶）";
 }
 
