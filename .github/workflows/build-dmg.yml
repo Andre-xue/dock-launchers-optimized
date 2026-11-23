@@ -1,0 +1,82 @@
+name: Build DMG (macOS)
+
+# 云端打包：在 GitHub 的 Apple Silicon macOS 机器上构建控制台 DMG 与便携 zip。
+# - 手动触发（workflow_dispatch）：构建并创建一个 ci-<日期>-<短hash> 的 Release
+# - 推送 v* 标签：构建并把产物挂到该标签的 Release
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # build.sh：编译分组启动器通用二进制并组装 7 个分组 App
+      # （产物 build/DockLaunchers.noindex，签名为 ad-hoc，脚本内已带 || true 回退）
+      - name: Build group launchers (build.sh)
+        run: bash build.sh
+
+      # build_center.sh：编译控制台 App（产物 build.noindex/DockLaunchers控制台.app）
+      # 版本号 PLVER：脚本优先取 git tag，CI 浅克隆无 tag 时自动用脚本内置默认 1.77.1；
+      # 签名：无本机证书时脚本自动退回 ad-hoc（--sign -），不会硬失败。
+      - name: Build center app (build_center.sh)
+        run: bash build_center.sh
+
+      # make_dmg.sh：从控制台 App 生成 DockLaunchers控制台-<版本>.dmg（仓库根目录）
+      - name: Make DMG (make_dmg.sh)
+        run: bash ./make_dmg.sh
+
+      # 便携包：控制台 App + 7 个分组 App + lists + install.command
+      # 用 ditto 打 zip 以完整保留 .app 包结构与资源叉。
+      - name: Assemble portable zip
+        run: |
+          set -euo pipefail
+          STAGE="$RUNNER_TEMP/DockLaunchers-portable"
+          rm -rf "$STAGE" dist
+          mkdir -p "$STAGE" dist
+          cp -R "build.noindex/DockLaunchers控制台.app" "$STAGE/"
+          cp -R build/DockLaunchers.noindex "$STAGE/分组App"
+          cp install.command "$STAGE/"
+          ditto -c -k --sequesterRsrc --keepParent "$STAGE" dist/DockLaunchers-portable.zip
+          ls -lh dist DockLaunchers控制台-*.dmg
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: DockLaunchers-dmg
+          path: |
+            DockLaunchers控制台-*.dmg
+            dist/DockLaunchers-portable.zip
+          if-no-files-found: error
+
+      # 挂 Release：标签触发用标签本身；手动触发用 ci-<日期>-<短hash>，
+      # 标题里带上从 App Info.plist 读到的真实版本号（与 DMG 文件名一致）。
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VER=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "build.noindex/DockLaunchers控制台.app/Contents/Info.plist")
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG="${{ github.ref_name }}"
+            TITLE="DockLaunchers控制台 ${TAG}"
+          else
+            TAG="ci-$(date +%Y%m%d)-${GITHUB_SHA::7}"
+            TITLE="DockLaunchers控制台 ${VER}（云端打包 $(date +%Y-%m-%d) · ${GITHUB_SHA::7}）"
+          fi
+          NOTES="GitHub Actions 云端构建（macos-14）。签名为 ad-hoc 临时签名、未公证：首次打开请在访达里右键 App 选择「打开」，或执行 xattr -dr com.apple.quarantine 去除隔离。DMG 内为控制台 App；portable zip 另含 7 个分组 App 与 install.command。"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" DockLaunchers控制台-*.dmg dist/DockLaunchers-portable.zip --clobber
+          else
+            gh release create "$TAG" DockLaunchers控制台-*.dmg dist/DockLaunchers-portable.zip \
+              --title "$TITLE" --notes "$NOTES"
+          fi
+          gh release view "$TAG" --json url,tagName,assets --jq '{url, tagName, assets: [.assets[] | {name, size}]}'
