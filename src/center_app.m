@@ -1455,6 +1455,12 @@ typedef NS_ENUM(NSInteger, DLRecordScene) { DLRecordSceneFull = 0, DLRecordScene
 }
 @end
 
+// SDK兼容：SCRecordingEditor 只在部分新SDK中声明；这里声明它唯一的调用入口为最小协议，
+// 使动态取到的实例（NSClassFromString）能在不引用该类的情况下完成 present 调用。
+@protocol DLRecordingEditorPresenting <NSObject>
+- (void)presentFromWindow:(NSWindow *)window completionHandler:(void (^)(NSError *error))handler;
+@end
+
 @interface Controller : NSObject <NSApplicationDelegate, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate, NSTextFieldDelegate, NSTextViewDelegate, NSComboBoxDelegate, NSCollectionViewDataSource, NSCollectionViewDelegate, QLPreviewPanelDataSource, QLPreviewPanelDelegate, NSUserNotificationCenterDelegate, AVCaptureFileOutputRecordingDelegate, NSURLSessionDownloadDelegate, WKNavigationDelegate>
 - (void)hideClipboardPreview;
 - (void)installClipboardHoverMonitor;
@@ -1693,7 +1699,7 @@ typedef NS_ENUM(NSInteger, DLRecordScene) { DLRecordSceneFull = 0, DLRecordScene
 @property (strong) NSPopUpButton *annotateWidthPopup;
 @property (strong) NSTextField *annotateStatus;
 @property (strong) NSString *annotateSourcePath;
-@property (strong) id recordingEditor; // SDK兼容：SCRecordingEditor 只在部分新SDK中声明，改用id动态持有（见 editCaptureHistoryVideo）
+@property (strong) id<DLRecordingEditorPresenting> recordingEditor; // SDK兼容：SCRecordingEditor 只在部分新SDK中声明，改用动态协议类型持有（见 editCaptureHistoryVideo）
 @property (strong) NSTableView *captureHistoryTable;
 @property (strong) NSArray *captureHistoryItems;
 @property (strong) NSArray *captureHistoryAllItems;
