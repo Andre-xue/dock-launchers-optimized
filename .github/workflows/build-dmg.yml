@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -72,7 +72,7 @@ jobs:
             TAG="ci-$(date +%Y%m%d)-${GITHUB_SHA::7}"
             TITLE="DockLaunchers控制台 ${VER}（云端打包 $(date +%Y-%m-%d) · ${GITHUB_SHA::7}）"
           fi
-          NOTES="GitHub Actions 云端构建（macos-15）。签名为 ad-hoc 临时签名、未公证：首次打开请在访达里右键 App 选择「打开」，或执行 xattr -dr com.apple.quarantine 去除隔离。DMG 内为控制台 App；portable zip 另含 7 个分组 App 与 install.command。"
+          NOTES="GitHub Actions 云端构建（macos-26）。签名为 ad-hoc 临时签名、未公证：首次打开请在访达里右键 App 选择「打开」，或执行 xattr -dr com.apple.quarantine 去除隔离。DMG 内为控制台 App；portable zip 另含 7 个分组 App 与 install.command。"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" DockLaunchers控制台-*.dmg dist/DockLaunchers-portable.zip --clobber
           else
