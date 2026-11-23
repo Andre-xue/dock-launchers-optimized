@@ -1283,7 +1283,8 @@ typedef NS_ENUM(NSInteger, DLRecordScene) { DLRecordSceneFull = 0, DLRecordScene
   rc.outputURL = segmentURL;
   rc.videoCodecType = [rc.availableVideoCodecTypes containsObject:AVVideoCodecTypeHEVC] ? AVVideoCodecTypeHEVC : AVVideoCodecTypeH264;
   rc.outputFileType = AVFileTypeMPEG4;
-  rc.mixesAudioWithMicrophone = NO;
+  // SDK兼容：mixesAudioWithMicrophone 只在部分新SDK中声明，运行时判断存在才用KVC设置（不存在时保持默认行为）
+  if ([rc respondsToSelector:@selector(setMixesAudioWithMicrophone:)]) [rc setValue:@NO forKey:@"mixesAudioWithMicrophone"];
   self.recordingOutput = [[SCRecordingOutput alloc] initWithConfiguration:rc delegate:self];
   NSError *err = nil;
   SCStream *stream = [[SCStream alloc] initWithFilter:filter configuration:config delegate:self];
@@ -1692,7 +1693,7 @@ typedef NS_ENUM(NSInteger, DLRecordScene) { DLRecordSceneFull = 0, DLRecordScene
 @property (strong) NSPopUpButton *annotateWidthPopup;
 @property (strong) NSTextField *annotateStatus;
 @property (strong) NSString *annotateSourcePath;
-@property (strong) SCRecordingEditor *recordingEditor;
+@property (strong) id recordingEditor; // SDK兼容：SCRecordingEditor 只在部分新SDK中声明，改用id动态持有（见 editCaptureHistoryVideo）
 @property (strong) NSTableView *captureHistoryTable;
 @property (strong) NSArray *captureHistoryItems;
 @property (strong) NSArray *captureHistoryAllItems;
@@ -26101,7 +26102,10 @@ static NSArray<NSString *> *ParseCSVLine(NSString *line) {
   NSDictionary *it = self.captureHistoryItems[row];
   if (![it[@"type"] isEqualToString:@"录屏"]) { [self showToast:@"只有录屏可以剪辑"]; return; }
   NSError *err = nil;
-  self.recordingEditor = [[SCRecordingEditor alloc] initWithURL:[NSURL fileURLWithPath:it[@"path"]]];
+  // SDK兼容：SCRecordingEditor 在公开SDK中未声明，运行时动态取类；取不到时提示剪辑不可用，录屏文件本身不受影响
+  Class editorClass = NSClassFromString(@"SCRecordingEditor");
+  if (!editorClass) { [self showToast:@"当前系统不支持录屏剪辑"]; return; }
+  self.recordingEditor = [[editorClass alloc] initWithURL:[NSURL fileURLWithPath:it[@"path"]]];
   [self.recordingEditor presentFromWindow:self.captureHistoryWindow completionHandler:^(NSError *error) {
     if (error) [self showToast:error.localizedDescription ?: @"无法打开剪辑器"];
   }];
