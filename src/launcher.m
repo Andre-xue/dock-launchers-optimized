@@ -162,7 +162,7 @@ static NSArray<NSURL *> *ExtractDraggedURLs(NSPasteboard *pb) {
 
 static NSString *gListFile = @"";
 
-// 皮肤：0 纯白 1 纯黑 2 质感玻璃 3 自定义图片
+// 皮肤：0 纯白 1 纯黑 2 质感玻璃 3 自定义图片 4 专业仪表盘（C，首次启动默认）
 static NSInteger gTheme = 0;
 static CGFloat gGlassAlpha = 0.82;
 static CGFloat gImgScale = 1.0;
@@ -575,6 +575,7 @@ static NSString *SignatureForEvent(NSEvent *e);
 - (void)skinWhite:(id)sender;
 - (void)skinBlack:(id)sender;
 - (void)skinGlass:(id)sender;
+- (void)skinPro:(id)sender;
 - (void)showGlassPanel:(id)sender;
 - (void)glassSliderChanged:(id)sender;
 - (void)closeGlassPanel:(id)sender;
@@ -690,6 +691,7 @@ static NSString *SignatureForEvent(NSEvent *e);
 
 static NSColor *ThemeBG(NSInteger t) {
   switch (t) {
+    case 4: return [NSColor colorWithCalibratedRed:14.0/255.0 green:17.0/255.0 blue:22.0/255.0 alpha:1.0]; // C 专业仪表盘 #0E1116
     case 1: return [NSColor colorWithCalibratedWhite:0.11 alpha:1.0];
     case 2: return [NSColor clearColor];
     case 3: return [NSColor clearColor];
@@ -698,20 +700,29 @@ static NSColor *ThemeBG(NSInteger t) {
 }
 static NSColor *ThemeText(NSInteger t) {
   switch (t) {
+    case 4: return [NSColor colorWithCalibratedRed:230.0/255.0 green:234.0/255.0 blue:240.0/255.0 alpha:1.0];
     case 1: case 2: case 3: return [NSColor whiteColor];
     default: return [NSColor colorWithCalibratedWhite:0.11 alpha:1.0];
   }
 }
 static NSColor *ThemeHint(NSInteger t) {
   switch (t) {
+    case 4: return [NSColor colorWithCalibratedWhite:1.0 alpha:0.55];
     case 1: case 2: case 3: return [NSColor colorWithCalibratedWhite:1.0 alpha:0.65];
     default: return [NSColor secondaryLabelColor];
   }
 }
 static NSColor *ThemeSel(NSInteger t) {
   switch (t) {
+    case 4: return [NSColor colorWithCalibratedRed:47.0/255.0 green:129.0/255.0 blue:247.0/255.0 alpha:0.30]; // C 强调蓝 #2F81F7 半透填充
     case 1: case 2: case 3: return [NSColor colorWithCalibratedWhite:1.0 alpha:0.22];
     default: return [NSColor colorWithCalibratedRed:0.90 green:0.94 blue:1.0 alpha:1.0];
+  }
+}
+static NSColor *ThemeAccent(NSInteger t) {
+  switch (t) {
+    case 4: return [NSColor colorWithCalibratedRed:47.0/255.0 green:129.0/255.0 blue:247.0/255.0 alpha:1.0]; // #2F81F7
+    default: return [NSColor controlAccentColor];
   }
 }
 
@@ -766,8 +777,15 @@ static NSColor *ThemeSel(NSInteger t) {
 - (void)drawRect:(NSRect)dirtyRect {
   if (self.selected && !self.iconMode) {
     [(self.selColor ?: ThemeSel(gTheme)) setFill];
-    NSBezierPath *p = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(self.bounds, 2, 2) xRadius:10 yRadius:10];
+    CGFloat rr = (gTheme == 4) ? 6 : 10; // C 主题低圆角
+    NSBezierPath *p = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(self.bounds, 2, 2) xRadius:rr yRadius:rr];
     [p fill];
+    if (gTheme == 4) { // C 主题：选中行加强调色细描边（命令面板风）
+      NSBezierPath *bp = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(self.bounds, 2.5, 2.5) xRadius:rr yRadius:rr];
+      bp.lineWidth = 1.5;
+      [ThemeAccent(gTheme) setStroke];
+      [bp stroke];
+    }
   }
   if (self.dropHighlight) {
     NSRect box = NSInsetRect(self.bounds, 3, 3);
@@ -909,13 +927,22 @@ static NSColor *ThemeSel(NSInteger t) {
   if (event.clickCount >= 2 && self.onDoubleClick) self.onDoubleClick();
 }
 - (void)drawRect:(NSRect)dirtyRect {
-  CGFloat r = NSHeight(self.bounds) / 2.0;
+  BOOL pro = (gTheme == 4);
+  CGFloat r = pro ? 6.0 : NSHeight(self.bounds) / 2.0; // C 主题：低圆角深色标牌
   NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:self.bounds xRadius:r yRadius:r];
-  [[NSColor colorWithCalibratedRed:1.0 green:0.37 blue:0.34 alpha:1.0] setFill];
-  [path fill];
+  if (pro) {
+    [[NSColor colorWithCalibratedRed:27.0/255.0 green:34.0/255.0 blue:44.0/255.0 alpha:1.0] setFill];
+    [path fill];
+    path.lineWidth = 1.0;
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.14] setStroke];
+    [path stroke];
+  } else {
+    [[NSColor colorWithCalibratedRed:1.0 green:0.37 blue:0.34 alpha:1.0] setFill];
+    [path fill];
+  }
   if (self.title.length == 0) return;
   NSFont *f = self.titleFont ?: [NSFont systemFontOfSize:20 weight:NSFontWeightSemibold];
-  NSDictionary *attrs = @{NSFontAttributeName: f, NSForegroundColorAttributeName: [NSColor whiteColor]};
+  NSDictionary *attrs = @{NSFontAttributeName: f, NSForegroundColorAttributeName: pro ? [NSColor colorWithCalibratedRed:230.0/255.0 green:234.0/255.0 blue:240.0/255.0 alpha:1.0] : [NSColor whiteColor]};
   NSSize ts = [self.title sizeWithAttributes:attrs];
   NSPoint pt = NSMakePoint((NSWidth(self.bounds) - ts.width) / 2.0,
                            (NSHeight(self.bounds) - ts.height) / 2.0);
@@ -2026,12 +2053,13 @@ static NSString *ResolveAppPath(NSString *target) {
   NSInteger cols = [self displayColumns];
   CGFloat W = self.scroll ? MAX(200, self.scroll.contentSize.width) : (480 - 32);
   CGFloat cellW = floor(W / cols);
-  CGFloat rowH = icons ? MAX(72.0, MIN(cellW, 96.0)) : 56.0;
+  CGFloat rowH = icons ? MAX(72.0, MIN(cellW, 96.0)) : (gTheme == 4 ? 44.0 : 56.0); // C 主题：紧凑行
   NSInteger rowCount = (self.items.count + cols - 1) / (cols > 0 ? cols : 1);
   self.listContainer.frame = NSMakeRect(0, 0, W, MAX(rowCount * rowH, 10));
 
   BOOL narrow = (cellW < 250);
-  NSFont *f = [NSFont systemFontOfSize:(narrow ? 16 : 18)];
+  NSFont *f = (gTheme == 4) ? [NSFont systemFontOfSize:(narrow ? 13.5 : 14.5) weight:NSFontWeightMedium]
+                            : [NSFont systemFontOfSize:(narrow ? 16 : 18)];
   NSInteger i = 0;
   for (NSDictionary *it in self.items) {
     NSInteger col = i % cols, gridRow = i / cols;
@@ -2072,7 +2100,7 @@ static NSString *ResolveAppPath(NSString *target) {
       i++;
       continue;
     }
-    CGFloat iconSize = narrow ? 34 : 40;
+    CGFloat iconSize = (gTheme == 4) ? (narrow ? 26 : 30) : (narrow ? 34 : 40);
     CGFloat iconX = narrow ? 12 : 20;
     if (customSz > 0) iconSize = MAX(24.0, MIN(customSz, rowH - 10));
     CGFloat textX = iconX + iconSize + (narrow ? 8 : 14);
@@ -2696,8 +2724,9 @@ static NSString *ResolveAppPath(NSString *target) {
 
 - (void)loadTheme {
   NSUserDefaults *d = GroupDefaults();
-  gTheme = [d integerForKey:@"skinTheme"];
-  if (gTheme < 0 || gTheme > 3) gTheme = 0;
+  if ([d objectForKey:@"skinTheme"] == nil) gTheme = 4; // 首次启动默认 C 专业仪表盘；已保存过皮肤的用户保持原选择
+  else gTheme = [d integerForKey:@"skinTheme"];
+  if (gTheme < 0 || gTheme > 4) gTheme = 0;
   if ([d objectForKey:@"skinGlassAlpha"]) gGlassAlpha = [d doubleForKey:@"skinGlassAlpha"];
   if ([d objectForKey:@"skinImgScale"]) gImgScale = [d doubleForKey:@"skinImgScale"];
   if ([d objectForKey:@"skinImgDX"]) gImgDX = [d doubleForKey:@"skinImgDX"];
@@ -2839,13 +2868,31 @@ static NSString *ResolveAppPath(NSString *target) {
     w.hasShadow = YES;
   }
 
-  BOOL solid = (gTheme == 0 || gTheme == 1);
+  BOOL solid = (gTheme == 0 || gTheme == 1 || gTheme == 4);
   self.scroll.drawsBackground = solid;
   self.scroll.backgroundColor = solid ? ThemeBG(gTheme) : [NSColor clearColor];
   self.listContainer.wantsLayer = YES;
   if (self.listContainer.layer) self.listContainer.layer.backgroundColor = [NSColor clearColor].CGColor;
 
+  [self.windowTitleLabel setNeedsDisplay:YES]; // 标题标牌配色随主题重绘（C 主题为深色低圆角）
   self.hintLabel.textColor = ThemeHint(gTheme);
+  self.hintLabel.font = (gTheme == 4) ? [NSFont monospacedDigitSystemFontOfSize:11 weight:NSFontWeightRegular]
+                                      : [NSFont systemFontOfSize:11];
+  if (self.scroll.layer) self.scroll.layer.cornerRadius = (gTheme == 4) ? 6 : 12; // C 主题低圆角
+  if (self.searchField) { // C 主题：搜索框做视觉主角（方形、深底、大一号字）；其他主题恢复原圆角样式
+    if (gTheme == 4) {
+      self.searchField.bezelStyle = NSTextFieldSquareBezel;
+      self.searchField.drawsBackground = YES;
+      self.searchField.backgroundColor = [NSColor colorWithCalibratedRed:21.0/255.0 green:26.0/255.0 blue:33.0/255.0 alpha:1.0];
+      self.searchField.textColor = ThemeText(gTheme);
+      self.searchField.font = [NSFont systemFontOfSize:15 weight:NSFontWeightMedium];
+    } else {
+      self.searchField.bezelStyle = NSTextFieldRoundedBezel;
+      self.searchField.drawsBackground = YES;
+      self.searchField.textColor = [NSColor textColor];
+      self.searchField.font = [NSFont systemFontOfSize:14];
+    }
+  }
   for (RowView *r in self.rows) {
     r.selColor = ThemeSel(gTheme);
     r.label.textColor = ThemeText(gTheme);
@@ -2866,7 +2913,8 @@ static NSString *ResolveAppPath(NSString *target) {
   if (!self.settingsExpanded) self.settingsExpanded = [NSMutableSet set];
   self.settingsTree = @[
     @{@"title":@"窗口背景", @"children":@[
-      @{@"title":@"纯白风格（默认）", @"sel":@"skinWhite:"},
+      @{@"title":@"专业仪表盘（默认）", @"sel":@"skinPro:"},
+      @{@"title":@"纯白风格", @"sel":@"skinWhite:"},
       @{@"title":@"纯黑风格", @"sel":@"skinBlack:"},
       @{@"title":@"质感玻璃", @"children":@[@{@"title":@"玻璃透明度…", @"sel":@"showGlassPanel:"}]},
       @{@"title":@"自定义背景", @"children":@[@{@"title":@"选择背景图片…", @"sel":@"customPick:"}]},
@@ -3826,8 +3874,8 @@ static NSString *ResolveAppPath(NSString *target) {
 }
 
 - (void)resetAllDefaults:(id)sender {
-  // 恢复为该分组"刚打开时"的初始状态
-  gTheme = 0;
+  // 恢复为该分组"刚打开时"的初始状态（默认皮肤 = C 专业仪表盘）
+  gTheme = 4;
   gGlassAlpha = 0.82;
   gImgScale = 1.0;
   gImgDX = 0.0;
@@ -3870,6 +3918,7 @@ static NSString *ResolveAppPath(NSString *target) {
 
 - (void)skinWhite:(id)sender { gTheme = 0; [self applyTheme]; }
 - (void)skinBlack:(id)sender { gTheme = 1; [self applyTheme]; }
+- (void)skinPro:(id)sender { gTheme = 4; [self applyTheme]; }
 - (void)skinGlass:(id)sender {
   if (gTheme != 2) gGlassAlpha = 0.82;
   gTheme = 2; [self applyTheme];

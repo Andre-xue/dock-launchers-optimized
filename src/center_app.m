@@ -448,11 +448,24 @@ static BOOL IsOurDockEntry(NSDictionary *item) {
 
 static BOOL DLThemeIsDark(void) {
   NSInteger t = [[NSUserDefaults standardUserDefaults] integerForKey:@"centerTheme"];
-  if (t == 2) return YES;
+  if (t == 2 || t == 3) return YES; // 3 = 专业仪表盘（C），按暗色处理
   if (t == 1) return NO;
   return [[[NSApp effectiveAppearance].name lowercaseString] containsString:@"dark"];
 }
+// ---- C 专业仪表盘（centerTheme = 3）配色：近黑底 / 卡片深灰 / 细边框 ----
+static BOOL DLThemeIsPro(void) {
+  return [[NSUserDefaults standardUserDefaults] integerForKey:@"centerTheme"] == 3;
+}
+static NSColor *DLProPageBG(void) { return [NSColor colorWithCalibratedRed:14.0/255.0 green:17.0/255.0 blue:22.0/255.0 alpha:1.0]; }   // #0E1116
+static NSColor *DLProCardBG(void) { return [NSColor colorWithCalibratedRed:21.0/255.0 green:26.0/255.0 blue:33.0/255.0 alpha:1.0]; }   // #151A21
+static NSColor *DLProSidebarBG(void) { return [NSColor colorWithCalibratedRed:10.0/255.0 green:13.0/255.0 blue:17.0/255.0 alpha:1.0]; } // #0A0D11
+// 前向声明：这三个取色函数定义在文件后部，但前部窗口构建代码已在调用（原代码同此模式）
+static NSColor *PageBackgroundForAppearance(NSAppearance *ap);
+static NSColor *CardBackgroundForAppearance(NSAppearance *ap);
+static NSColor *SidebarBackgroundForAppearance(NSAppearance *ap);
+
 static NSColor *DLButtonBackground(void) {
+  if (DLThemeIsPro()) return [NSColor colorWithCalibratedRed:27.0/255.0 green:34.0/255.0 blue:44.0/255.0 alpha:1.0]; // #1B222C
   return DLThemeIsDark() ? [NSColor colorWithCalibratedWhite:0.24 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.975 alpha:1.0];
 }
 
@@ -495,6 +508,7 @@ static NSImage *ToolIconImage(NSString *symbol, NSColor *color) {
 
 
 static NSColor *DLRowBackground(void) {
+  if (DLThemeIsPro()) return DLProCardBG();
   return DLThemeIsDark() ? [NSColor colorWithCalibratedWhite:0.16 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.985 alpha:1.0];
 }
 
@@ -520,8 +534,8 @@ static NSColor *DLRowBackground(void) {
 }
 - (void)drawRect:(NSRect)dirtyRect {
   NSInteger themeVal = [[NSUserDefaults standardUserDefaults] integerForKey:@"centerTheme"];
-  BOOL darkBg = (themeVal == 2) || (themeVal == 0 && [[[NSApp effectiveAppearance].name lowercaseString] containsString:@"dark"]);
-  [[NSColor colorWithCalibratedWhite:(darkBg ? 0.20 : 0.985) alpha:1.0] setFill];
+  BOOL darkBg = (themeVal == 2 || themeVal == 3) || (themeVal == 0 && [[[NSApp effectiveAppearance].name lowercaseString] containsString:@"dark"]);
+  if (themeVal == 3) [DLProCardBG() setFill]; else [[NSColor colorWithCalibratedWhite:(darkBg ? 0.20 : 0.985) alpha:1.0] setFill]; // C 主题图表底色
   [[NSBezierPath bezierPathWithRoundedRect:self.bounds xRadius:10 yRadius:10] fill];
   if (self.values.count < 2) return;
   CGFloat w = self.bounds.size.width, h = self.bounds.size.height;
@@ -2318,7 +2332,7 @@ static void AppWatchStreamCallback(ConstFSEventStreamRef streamRef, void *info, 
 }
 - (void)drawRect:(NSRect)dirtyRect {
   NSInteger themeVal = [[NSUserDefaults standardUserDefaults] integerForKey:@"centerTheme"];
-  BOOL dark = (themeVal == 2) || (themeVal == 0 && [[[NSApp effectiveAppearance].name lowercaseString] containsString:@"dark"]);
+  BOOL dark = (themeVal == 2 || themeVal == 3) || (themeVal == 0 && [[[NSApp effectiveAppearance].name lowercaseString] containsString:@"dark"]);
   [[NSColor colorWithCalibratedWhite:(dark ? 0.18 : 0.97) alpha:0.92] setFill];
   [[NSBezierPath bezierPathWithRoundedRect:self.bounds xRadius:8 yRadius:8] fill];
   CGFloat h = self.bounds.size.height / MAX(self.letters.count,1);
@@ -2385,7 +2399,7 @@ static NSDate *InstallDateForPath(NSString *path) {
 }
 - (void)drawRect:(NSRect)dirtyRect {
   NSInteger themeVal = [[NSUserDefaults standardUserDefaults] integerForKey:@"centerTheme"];
-  BOOL darkBg = (themeVal == 2) || (themeVal == 0 && [[[NSApp effectiveAppearance].name lowercaseString] containsString:@"dark"]);
+  BOOL darkBg = (themeVal == 2 || themeVal == 3) || (themeVal == 0 && [[[NSApp effectiveAppearance].name lowercaseString] containsString:@"dark"]);
   [[NSColor colorWithCalibratedWhite:(darkBg ? 0.20 : 0.985) alpha:1.0] setFill];
   [[NSBezierPath bezierPathWithRoundedRect:self.bounds xRadius:8 yRadius:8] fill];
   if (!self.values.count) return;
@@ -2422,11 +2436,16 @@ static NSDate *InstallDateForPath(NSString *path) {
     self.wantsLayer = YES;
     self.identifier = @"MetricCard";
     NSInteger themeVal = [[NSUserDefaults standardUserDefaults] integerForKey:@"centerTheme"];
-    BOOL dark = (themeVal == 2) || (themeVal == 0 && [[[NSApp effectiveAppearance].name lowercaseString] containsString:@"dark"]);
+    BOOL dark = (themeVal == 2 || themeVal == 3) || (themeVal == 0 && [[[NSApp effectiveAppearance].name lowercaseString] containsString:@"dark"]);
     self.layer.backgroundColor = (dark ? [NSColor colorWithCalibratedWhite:0.13 alpha:1.0] : [NSColor whiteColor]).CGColor;
     self.layer.cornerRadius = 14;
     self.layer.borderWidth = 1;
     self.layer.borderColor = (dark ? [NSColor colorWithCalibratedWhite:1.0 alpha:0.14] : [NSColor colorWithCalibratedWhite:0.93 alpha:1.0]).CGColor;
+    if (themeVal == 3) { // C 专业仪表盘：卡片深灰 #151A21 + 细边框 + 低圆角
+      self.layer.backgroundColor = DLProCardBG().CGColor;
+      self.layer.borderColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.10].CGColor;
+      self.layer.cornerRadius = 8;
+    }
     CGFloat w = frame.size.width;
     _titleLabel = [NSTextField labelWithString:title];
     _titleLabel.font = [NSFont systemFontOfSize:10.5 weight:NSFontWeightSemibold];
@@ -2438,6 +2457,10 @@ static NSDate *InstallDateForPath(NSString *path) {
     _valueLabel.textColor = accent;
     _valueLabel.frame = NSMakeRect(12, frame.size.height - 64, w - 24, 28);
     [self addSubview:_valueLabel];
+    if (themeVal == 3) { // C 专业仪表盘：指标大数字用等宽数字字体
+      _valueLabel.font = [NSFont monospacedDigitSystemFontOfSize:26 weight:NSFontWeightBold];
+      _valueLabel.textColor = [NSColor colorWithCalibratedWhite:0.95 alpha:1.0];
+    }
     _detailLabel = [NSTextField labelWithString:@""];
     _detailLabel.font = [NSFont systemFontOfSize:9.5];
     _detailLabel.textColor = [NSColor secondaryLabelColor];
@@ -3601,6 +3624,10 @@ static void HideDockHoverTip(void) {
     [ud0 setBool:YES forKey:@"centerMenuTextInit"];
     [ud0 synchronize];
   }
+  if ([ud0 objectForKey:@"centerTheme"] == nil) {
+    [ud0 setInteger:3 forKey:@"centerTheme"]; // 首次启动默认 C 专业仪表盘；已设置过主题的用户保持原选择（设置页可切换）
+    [ud0 synchronize];
+  }
   [NSWindow setAllowsAutomaticWindowTabbing:NO];
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(dlWindowBecameKey:) name:NSWindowDidBecomeKeyNotification object:nil];
   [self applyWindowChrome:self.window];
@@ -4409,7 +4436,7 @@ static OSStatus TranslationHotKeyHandler(EventHandlerCallRef nextHandler, EventR
   NSView *side = [[NSView alloc] initWithFrame:NSMakeRect(0,0,240,660)];
   side.wantsLayer = YES;
   side.identifier = @"DLSidebar";
-  side.layer.backgroundColor = PageBackgroundForAppearance(NSApp.effectiveAppearance).CGColor;
+  side.layer.backgroundColor = SidebarBackgroundForAppearance(NSApp.effectiveAppearance).CGColor;
   side.autoresizingMask = NSViewHeightSizable;
   [root addSubview:side];
   NSImageView *avatar = [[NSImageView alloc] initWithFrame:NSMakeRect(84, 580.5, 72, 72)];
@@ -5057,22 +5084,29 @@ static OSStatus TranslationHotKeyHandler(EventHandlerCallRef nextHandler, EventR
 
 static BOOL ThemeIsDark(NSAppearance *ap) {
   NSInteger t = [[NSUserDefaults standardUserDefaults] integerForKey:@"centerTheme"];
-  if (t == 2) return YES;
+  if (t == 2 || t == 3) return YES; // 3 = 专业仪表盘（C），按暗色处理
   if (t == 1) return NO;
   if (!ap) ap = NSApp.effectiveAppearance;
   return [[ap.name lowercaseString] containsString:@"dark"];
 }
 
 static NSColor *PageBackgroundForAppearance(NSAppearance *ap) {
+  if (DLThemeIsPro()) return DLProPageBG();
   BOOL dark = ThemeIsDark(ap);
   return dark ? [NSColor colorWithCalibratedWhite:0.09 alpha:1.0] : [NSColor colorWithCalibratedWhite:1.0 alpha:1.0];
 }
+static NSColor *SidebarBackgroundForAppearance(NSAppearance *ap) {
+  if (DLThemeIsPro()) return DLProSidebarBG(); // C 主题：侧边栏比内容区再深一档
+  return PageBackgroundForAppearance(ap);
+}
 
 static NSColor *CardBackgroundForAppearance(NSAppearance *ap) {
+  if (DLThemeIsPro()) return DLProCardBG();
   BOOL dark = ThemeIsDark(ap);
   return dark ? [NSColor colorWithCalibratedWhite:0.13 alpha:1.0] : [NSColor colorWithCalibratedWhite:1.0 alpha:1.0];
 }
 static NSColor *CardBorderForAppearance(NSAppearance *ap) {
+  if (DLThemeIsPro()) return [NSColor colorWithCalibratedWhite:1.0 alpha:0.10]; // C 主题细边框
   BOOL dark = ThemeIsDark(ap);
   return dark ? [NSColor colorWithCalibratedWhite:1.0 alpha:0.12] : [NSColor colorWithCalibratedWhite:0.0 alpha:0.08];
 }
@@ -5081,7 +5115,7 @@ static NSColor *CardBorderForAppearance(NSAppearance *ap) {
   NSView *c = [[NSView alloc] initWithFrame:r];
   c.wantsLayer = YES;
   c.identifier = @"DLCard";
-  c.layer.cornerRadius = 18;
+  c.layer.cornerRadius = DLThemeIsPro() ? 8 : 18; // C 主题低圆角
   c.layer.backgroundColor = CardBackgroundForAppearance(NSApp.effectiveAppearance).CGColor;
   c.layer.shadowColor = [NSColor blackColor].CGColor;
   c.layer.shadowOpacity = 0.0;
@@ -20068,9 +20102,9 @@ static NSArray<NSString *> *ParseCSVLine(NSString *line) {
   // 第一列：常规
   NSView *tTheme = tileAt(0, 500); tileLabel(tTheme, @"显示主题");
   self.themePopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(12, 8, tileW - 24, 26) pullsDown:NO];
-  [self.themePopup addItemsWithTitles:@[@"跟随系统", @"亮色", @"暗色"]];
+  [self.themePopup addItemsWithTitles:@[@"跟随系统", @"亮色", @"暗色", @"专业仪表盘（C）"]];
   NSInteger tv = [[NSUserDefaults standardUserDefaults] integerForKey:@"centerTheme"];
-  [self.themePopup selectItemAtIndex:(tv >= 0 && tv <= 2 ? tv : 0)];
+  [self.themePopup selectItemAtIndex:(tv >= 0 && tv <= 3 ? tv : 0)];
   self.themePopup.target = self; self.themePopup.action = @selector(themeChanged:);
   self.themePopup.toolTip = @"切换控制台整体外观";
   [tTheme addSubview:self.themePopup];
@@ -20312,7 +20346,7 @@ static NSArray<NSString *> *ParseCSVLine(NSString *line) {
   NSInteger tv = [[NSUserDefaults standardUserDefaults] integerForKey:@"centerTheme"];
   NSAppearance *ap = nil;
   if (tv == 1) ap = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
-  else if (tv == 2) ap = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+  else if (tv == 2 || tv == 3) ap = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
   NSApp.appearance = ap;
   self.window.appearance = ap;
   if (self.popover) {
@@ -20332,7 +20366,7 @@ static NSArray<NSString *> *ParseCSVLine(NSString *line) {
   self.window.backgroundColor = PageBackgroundForAppearance(NSApp.effectiveAppearance);
   if (self.contentScroll) self.contentScroll.backgroundColor = PageBackgroundForAppearance(NSApp.effectiveAppearance);
   if (self.content) self.content.layer.backgroundColor = PageBackgroundForAppearance(NSApp.effectiveAppearance).CGColor;
-  if (self.sideView) self.sideView.layer.backgroundColor = PageBackgroundForAppearance(NSApp.effectiveAppearance).CGColor;
+  if (self.sideView) self.sideView.layer.backgroundColor = SidebarBackgroundForAppearance(NSApp.effectiveAppearance).CGColor;
   if (self.statusItem.button) self.statusItem.button.contentTintColor = [NSColor labelColor];
 }
 
